@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cobra Win — Admin Panel</title>
+    <style>
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { margin: 0; background: #060913; color: #e6edf3; padding: 16px; }
+        .wrap { max-width: 1020px; margin: 0 auto; }
+        .topbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: #0b1220; border: 1px solid #1e3358; border-radius: 14px; padding: 14px 18px; margin-bottom: 16px; }
+        .brand { font-size: 20px; font-weight: 900; color: #fff; }
+        .brand span { color: #388bfd; }
+        .key-box { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+        input, select { background: #070d19; border: 1px solid #243b61; color: #fff; border-radius: 8px; padding: 8px 10px; font-size: 13px; outline: none; }
+        button { background: linear-gradient(135deg, #0070f3, #388bfd); color: #fff; border: none; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+        button:hover { opacity: 0.92; }
+        button.secondary { background: #162238; border: 1px solid #2b4c7e; color: #93c5fd; }
+        button.danger { background: #dc2626; }
+        button.success { background: #16a34a; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .stat-card { background: #0b1220; border: 1px solid #1c2d4a; border-radius: 12px; padding: 14px; }
+        .stat-val { font-size: 21px; font-weight: 900; color: #60a5fa; margin-top: 4px; }
+        .stat-lbl { font-size: 12px; color: #8b949e; }
+
+        .panel { background: #0b1220; border: 1px solid #1c2d4a; border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+        .panel-title { font-size: 15px; font-weight: 800; color: #fff; margin-bottom: 12px; }
+        .row-flex { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+        .modes-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+        .mode-card { background: #070d19; border: 1px solid #1e3358; border-radius: 12px; padding: 12px; }
+        .mode-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .mode-badge { background: rgba(56,139,253,0.18); color: #60a5fa; padding: 3px 8px; border-radius: 999px; font-size: 12px; font-weight: 800; }
+        .mode-meta { font-size: 11px; color: #8b949e; margin-bottom: 8px; line-height: 1.5; }
+        .mode-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+        th, td { padding: 10px 8px; border-bottom: 1px solid #132036; text-align: left; }
+        th { color: #93c5fd; background: #0e1a30; }
+        .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+        .pill-ok { background: rgba(22,163,74,0.2); color: #4ade80; }
+        .pill-warn { background: rgba(234,179,8,0.2); color: #facc15; }
+        .pill-bad { background: rgba(220,38,38,0.2); color: #f87171; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="topbar">
+        <div class="brand">🐍 COBRA<span>WIN</span> <span style="font-size:13px; color:#93c5fd;">ADMIN PANEL</span></div>
+        <div class="key-box">
+            <input type="password" id="admin-key" value="cobra123" placeholder="Admin Secret Key">
+            <button type="button" id="btn-refresh">Connect / Refresh</button>
+            <button type="button" class="secondary" id="btn-open-app">Open App</button>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-lbl">Total Users</div>
+            <div class="stat-val" id="st-users">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-lbl">Total Wallet Balance</div>
+            <div class="stat-val" id="st-balance">₹0.00</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-lbl">Pending Deposits</div>
+            <div class="stat-val" id="st-deposits">0</div>
+        </div>
+    </div>
+
+    <!-- Har Mode Ka Alag WinGo Control -->
+    <div class="panel">
+        <div class="panel-title">🎯 WinGo Modes Control (Har Minute Ka Alag Result)</div>
+        <div class="modes-grid" id="modes-grid"></div>
+    </div>
+
+    <!-- Manual Wallet Adjust -->
+    <div class="panel">
+        <div class="panel-title">💰 Add / Deduct User Balance</div>
+        <div class="row-flex">
+            <input type="text" id="bal-user-id" placeholder="User ID or Phone">
+            <input type="number" step="0.01" id="bal-amount" placeholder="Amount (e.g. 500 or -100)">
+            <button type="button" class="success" id="btn-adjust-bal">Update Wallet</button>
+        </div>
+    </div>
+
+    <!-- Deposits Table -->
+    <div class="panel">
+        <div class="panel-title">📥 Deposit Requests</div>
+        <div style="overflow-x:auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User / Phone</th>
+                        <th>Amount</th>
+                        <th>UTR</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="deposits-tbody">
+                    <tr><td colspan="6" style="color:#8b949e;">No deposit requests yet.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="panel">
+        <div class="panel-title">👥 Registered Users</div>
+        <div style="overflow-x:auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>UID</th>
+                        <th>Phone</th>
+                        <th>Balance</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="users-tbody">
+                    <tr><td colspan="5" style="color:#8b949e;">Connect admin key to load users.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const MODE_LABELS = {
+        '30s': 'WinGo 30s',
+        '1m':  'WinGo 1 Min',
+        '3m':  'WinGo 3 Min',
+        '5m':  'WinGo 5 Min'
+    };
+
+    function numberOptionsHtml() {
+        return `
+            <option value="">Auto Random</option>
+            <option value="0">0 (Red + Violet)</option>
+            <option value="1">1 (Green)</option>
+            <option value="2">2 (Red)</option>
+            <option value="3">3 (Green)</option>
+            <option value="4">4 (Red)</option>
+            <option value="5">5 (Green + Violet)</option>
+            <option value="6">6 (Red)</option>
+            <option value="7">7 (Green)</option>
+            <option value="8">8 (Red)</option>
+            <option value="9">9 (Green)</option>
+        `;
+    }
+
+    function initModeCards() {
+        const grid = document.getElementById('modes-grid');
+        grid.innerHTML = Object.keys(MODE_LABELS).map((mode) => `
+            <div class="mode-card" id="mode-card-${mode}">
+                <div class="mode-head">
+                    <strong>${MODE_LABELS[mode]}</strong>
+                    <span class="mode-badge" id="mode-forced-${mode}">AUTO</span>
+                </div>
+                <div class="mode-meta" id="mode-meta-${mode}">
+                    Period: — • Timer: —s<br>
+                    Bets: 0 • Last: —
+                </div>
+                <select id="mode-select-${mode}" style="width:100%;">
+                    ${numberOptionsHtml()}
+                </select>
+                <div class="mode-actions">
+                    <button type="button" id="mode-set-btn-${mode}">Set Result</button>
+                    <button type="button" class="secondary" id="mode-auto-btn-${mode}">Auto</button>
+                </div>
+            </div>
+        `).join('');
+
+        Object.keys(MODE_LABELS).forEach((mode) => {
+            const setBtn = document.getElementById(`mode-set-btn-${mode}`);
+            const autoBtn = document.getElementById(`mode-auto-btn-${mode}`);
+            if (setBtn) setBtn.addEventListener('click', () => setModeResult(mode));
+            if (autoBtn) autoBtn.addEventListener('click', () => clearModeResult(mode));
+        });
+    }
+
+    function getHeaders() {
+        return {
+            'Content-Type': 'application/json',
+            'x-admin-key': document.getElementById('admin-key').value.trim()
+        };
+    }
+
+    async function loadDashboard(showAlertOnFail = false) {
+        try {
+            const res = await fetch('/api/admin/overview', { headers: getHeaders() });
+            const data = await res.json();
+            if (!data.success) {
+                if (showAlertOnFail) alert(data.message || 'Invalid Admin Key');
+                return;
+            }
+
+            document.getElementById('st-users').innerText = data.stats.totalUsers;
+            document.getElementById('st-balance').innerText = `₹${Number(data.stats.totalBalance).toFixed(2)}`;
+            document.getElementById('st-deposits').innerText = data.stats.pendingDeposits;
+
+            const modes = data.modes || {};
+            Object.keys(MODE_LABELS).forEach((mode) => {
+                const info = modes[mode];
+                if (!info) return;
+                const forcedBadge = document.getElementById(`mode-forced-${mode}`);
+                const metaEl = document.getElementById(`mode-meta-${mode}`);
+
+                const isForced = info.forcedNumber !== null && info.forcedNumber !== undefined;
+                forcedBadge.innerText = isForced ? `FORCED: ${info.forcedNumber}` : 'AUTO';
+                forcedBadge.style.background = isForced ? 'rgba(22,163,74,0.22)' : 'rgba(56,139,253,0.18)';
+                forcedBadge.style.color = isForced ? '#4ade80' : '#60a5fa';
+
+                const lastTxt = info.lastResult ? `${info.lastResult.number} (${info.lastResult.color})` : '—';
+                metaEl.innerHTML = `Period: <strong>${info.periodId}</strong> • Timer: <strong>${info.timeLeft}s</strong><br>Active Bets: <strong>${info.activeBetsCount}</strong> • Last: <strong>${lastTxt}</strong>`;
+            });
+
+            renderUsers(data.users || []);
+            renderDeposits(data.deposits || []);
+        } catch (err) {
+            if (showAlertOnFail) alert('Server se connect nahi ho paaya.');
+            console.error('Admin overview error:', err);
+        }
+    }
+
+    function renderUsers(users) {
+        const tbody = document.getElementById('users-tbody');
+        if (!users.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="color:#8b949e;">No users found.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = users.map((u) => `
+            <tr>
+                <td>${u.id}</td>
+                <td>${u.phone}</td>
+                <td><strong>₹${Number(u.balance || 0).toFixed(2)}</strong></td>
+                <td><span class="pill ${u.blocked ? 'pill-bad' : 'pill-ok'}">${u.blocked ? 'Blocked' : 'Active'}</span></td>
+                <td><button type="button" class="secondary" onclick="toggleBlock('${u.id}')">${u.blocked ? 'Unblock' : 'Block'}</button></td>
+            </tr>
+        `).join('');
+    }
+
+    function renderDeposits(deposits) {
+        const tbody = document.getElementById('deposits-tbody');
+        if (!deposits.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="color:#8b949e;">No deposit requests yet.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = deposits.map((d) => {
+            const cls = d.status === 'Approved' ? 'pill-ok' : (d.status === 'Rejected' ? 'pill-bad' : 'pill-warn');
+            const actions = d.status === 'Pending'
+                ? `<button type="button" class="success" onclick="depositAction('${d.id}', 'approve')">Approve</button>
+                   <button type="button" class="danger" onclick="depositAction('${d.id}', 'reject')">Reject</button>`
+                : '—';
+            return `
+                <tr>
+                    <td>${d.id}</td>
+                    <td>${d.phone} (${d.userId})</td>
+                    <td><strong>₹${Number(d.amount).toFixed(2)}</strong></td>
+                    <td>${d.utr}</td>
+                    <td><span class="pill ${cls}">${d.status}</span></td>
+                    <td>${actions}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async function setModeResult(mode) {
+        try {
+            const selectEl = document.getElementById(`mode-select-${mode}`);
+            const val = selectEl ? selectEl.value : '';
+            const res = await fetch('/api/admin/set-result', {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify({ mode, number: val === '' ? null : Number(val) })
+            });
+            const data = await res.json();
+            if (data.success) {
+                await loadDashboard(false);
+                alert(`${MODE_LABELS[mode]} result set to: ${data.nextWinGoResult === null ? 'AUTO' : data.nextWinGoResult}`);
+            } else {
+                alert(data.message || 'Failed');
+            }
+        } catch (err) {
+            alert('Request error: ' + err.message);
+        }
+    }
+
+    async function clearModeResult(mode) {
+        const selectEl = document.getElementById(`mode-select-${mode}`);
+        if (selectEl) selectEl.value = '';
+        await setModeResult(mode);
+    }
+
+    async function adjustBalance() {
+        const userId = document.getElementById('bal-user-id').value.trim();
+        const amount = Number(document.getElementById('bal-amount').value);
+        const res = await fetch('/api/admin/adjust-balance', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ userId, amount })
+        });
+        const data = await res.json();
+        alert(data.message || (data.success ? 'Balance updated!' : 'Failed'));
+        if (data.success) loadDashboard(false);
+    }
+
+    async function toggleBlock(userId) {
+        const res = await fetch('/api/admin/toggle-block', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ userId })
+        });
+        const data = await res.json();
+        if (data.success) loadDashboard(false);
+        else alert(data.message || 'Failed');
+    }
+
+    async function depositAction(id, action) {
+        const res = await fetch('/api/admin/deposit-action', {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify({ id, action })
+        });
+        const data = await res.json();
+        if (data.success) loadDashboard(false);
+        else alert(data.message || 'Failed');
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        initModeCards();
+        document.getElementById('btn-refresh').addEventListener('click', () => loadDashboard(true));
+        document.getElementById('btn-open-app').addEventListener('click', () => { window.location.href = '/'; });
+        document.getElementById('btn-adjust-bal').addEventListener('click', adjustBalance);
+        loadDashboard(false);
+        setInterval(() => loadDashboard(false), 2000);
+    });
+</script>
+</body>
+</html>

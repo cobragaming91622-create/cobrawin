@@ -1,0 +1,57 @@
+{
+  "users": [
+    {
+      "id": "2789365",
+      "phone": "9999999999",
+      "password": "123",
+      "balance": 395.61,
+      "blocked": true
+    },
+    {
+      "id": "9458861",
+      "phone": "9162289694",
+      "password": "princegosw713",
+      "balance": 1243.7,
+      "blocked": false
+    }
+  ],
+  "deposits": [
+    {
+      "id": "DEP1795324060328",
+      "userId": "9458861",
+      "phone": "9162289694",
+      "amount": 500,
+      "method": "UPI QR (Paytm)",
+      "utr": "303339845306",
+      "status": "Approved",
+      "time": "22/11/2026, 10:37:40 am"
+    },
+    {
+      "id": "DEP1795279184234",
+      "userId": "9458861",
+      "phone": "9162289694",
+      "amount": 500,
+      "method": "UPI QR (Paytm)",
+      "utr": "45235345345",
+      "status": "Approved",
+      "time": "21/11/2026, 10:09:44 pm"
+    },
+    {
+      "id": "DEP1795272986249",
+      "userId": "9458861",
+      "phone": "9162289694",
+      "amount": 100,
+      "method": "UPI QR (Paytm)",
+      "utr": "1223123123",
+      "status": "Approved",
+      "time": "21/11/2026, 8:26:26 pm"
+    }
+  ],
+  "withdrawals": [],
+  "nextWinGoResults": {
+    "30s": null,
+    "1m": null,
+    "3m": null,
+    "5m": null
+  }
+}
