@@ -34,10 +34,10 @@ app.get('/admin.html', (req, res) => {
 });
 
 const WINGO_MODES = {
-    '30s': { duration: 30, basePeriod: 20261121100050824 },
-    '1m':  { duration: 60, basePeriod: 20261121200050101 },
-    '3m':  { duration: 180, basePeriod: 20261121300050101 },
-    '5m':  { duration: 300, basePeriod: 20261121500050101 }
+    '30s': { duration: 30, basePeriod: 2026112110050824 },
+    '1m':  { duration: 60, basePeriod: 2026112120050101 },
+    '3m':  { duration: 180, basePeriod: 2026112130050101 },
+    '5m':  { duration: 300, basePeriod: 2026112150050101 }
 };
 
 function defaultNextResults() {
@@ -88,19 +88,53 @@ let db = loadData();
 // Har mode ('30s', '1m', '3m', '5m') ki alag state
 const gameState = {};
 Object.keys(WINGO_MODES).forEach((mode) => {
-    gameState[mode] = {
-        timeLeft: WINGO_MODES[mode].duration,
-        periodId: WINGO_MODES[mode].basePeriod,
-        activeBets: [],
-        history: [
-            { periodId: String(WINGO_MODES[mode].basePeriod - 1), number: 5, bigSmall: 'Big', color: 'Green' },
-            { periodId: String(WINGO_MODES[mode].basePeriod - 2), number: 7, bigSmall: 'Big', color: 'Green' },
-            { periodId: String(WINGO_MODES[mode].basePeriod - 3), number: 4, bigSmall: 'Small', color: 'Red' },
-            { periodId: String(WINGO_MODES[mode].basePeriod - 4), number: 5, bigSmall: 'Big', color: 'Violet' },
-            { periodId: String(WINGO_MODES[mode].basePeriod - 5), number: 7, bigSmall: 'Big', color: 'Green' }
-        ]
-    };
+  const base = BigInt(WINGO_MODES[mode].basePeriod);
+  gameState[mode] = {
+    timeLeft: WINGO_MODES[mode].duration,
+    periodId: base.toString(),
+    activeBets: [],
+    history: [
+      { periodId: (base - 1n).toString(), number: 5, bigSmall: 'Big', color: 'Green' },
+      { periodId: (base - 2n).toString(), number: 7, bigSmall: 'Big', color: 'Green' },
+      { periodId: (base - 3n).toString(), number: 4, bigSmall: 'Small', color: 'Red' },
+      { periodId: (base - 4n).toString(), number: 5, bigSmall: 'Big', color: 'Violet' },
+      { periodId: (base - 5n).toString(), number: 7, bigSmall: 'Big', color: 'Green' }
+    ]
+  };
 });
+function mapWingoModeKey(rawMode) {
+  const key = String(rawMode || '').trim().toLowerCase();
+  if (key === '30sec' || key === '30s') return '30s';
+  if (key === '1min' || key === '1m') return '1m';
+  if (key === '3min' || key === '3m') return '3m';
+  if (key === '5min' || key === '5m') return '5m';
+  return rawMode;
+}
+
+app.get('/api/wingo/state', (req, res) => {
+  const rawMode = req.query.mode;
+  const mappedMode = mapWingoModeKey(rawMode);
+
+  if (mappedMode && gameState[mappedMode]) {
+    return res.json({
+      [rawMode]: gameState[mappedMode],
+      [mappedMode]: gameState[mappedMode]
+    });
+  }
+
+  return res.json(gameState);
+});
+// Server ka ek hi master timer (har 1 second chalega)
+setInterval(() => {
+  Object.keys(WINGO_MODES).forEach((mode) => {
+    const state = gameState[mode];
+    if (state.timeLeft > 1) {
+      state.timeLeft -= 1;
+    } else {
+  settleModeRound(mode);
+}
+  });
+}, 1000);
 
 function getOutcome(num) {
     const n = Number(num);
@@ -183,7 +217,7 @@ function settleModeRound(mode) {
     saveData(db);
 
     st.activeBets = [];
-    st.periodId += 1;
+    st.periodId = (BigInt(st.periodId) + 1n).toString();
     st.timeLeft = cfg.duration;
 
     io.emit('publicResult', {

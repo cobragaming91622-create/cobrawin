@@ -723,7 +723,7 @@
 
         <div class="sub-promo-grid">
             <div class="sub-promo-card" onclick="openGiftBoxesFlow()">
-                <img src="wheel.png" alt="Wheel of Fortune" class="banner-img-card">
+                <img src="Wheel.png" alt="Wheel of Fortune" class="banner-img-card">
             </div>
             <div class="sub-promo-card" onclick="openAccSubPage('vip')">
                 <img src="vip.png" alt="VIP Privileges" class="banner-img-card">
@@ -2729,8 +2729,8 @@
             }
         }
 
-        room.period += 1;
-        room.timeLeft = room.duration;
+      // room.period = (BigInt(String(room.period)) + 1n).toString();
+      // room.timeLeft = room.duration;
 
         if (document.getElementById('game-screen').style.display === 'flex' && currentWingoMode === mode) {
             renderActiveWingoRoom();
@@ -2857,25 +2857,45 @@
         }
     }
 
-    function startWingoRoomsLoop() {
-        if (wingoRoomTicker) return;
-        renderActiveWingoRoom();
-        wingoRoomTicker = setInterval(() => {
-            Object.keys(wingoRooms).forEach(mode => {
-                const room = wingoRooms[mode];
-                if (mode === '30Sec' && room.timeLeft > 30) {
-                    room.timeLeft = 30;
-                }
-                room.timeLeft -= 1;
-                if (room.timeLeft <= 0) {
-                    settleRoomRound(mode);
-                }
-            });
-            if (document.getElementById('game-screen').style.display === 'flex') {
-                renderActiveWingoRoom();
-            }
-        }, 1000);
+   async function syncRoomFromServer(mode) {
+  try {
+    const res = await fetch(`/api/wingo/state?mode=${encodeURIComponent(mode)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const state = data[mode] || data;
+
+ if (state.periodId !== undefined) {
+  wingoRooms[mode].periodId = String(state.periodId);
+  wingoRooms[mode].period = String(state.periodId);
+}
+if (state.timeLeft !== undefined) {
+  wingoRooms[mode].timeLeft = Number(state.timeLeft);
+}
+if (Array.isArray(state.history)) {
+      wingoRooms[mode].history = state.history;
     }
+  } catch (e) {
+    console.error('Sync error:', e);
+  }
+}
+
+function startWingoRoomsLoop() {
+  if (wingoRoomTicker) return;
+
+  Object.keys(wingoRooms).forEach(mode => syncRoomFromServer(mode));
+  renderActiveWingoRoom();
+
+  wingoRoomTicker = setInterval(async () => {
+    await Promise.all(
+      Object.keys(wingoRooms).map(mode => syncRoomFromServer(mode))
+    );
+
+    const gameScreen = document.getElementById('game-screen');
+    if (gameScreen && gameScreen.style.display !== 'none') {
+      renderActiveWingoRoom();
+    }
+  }, 1000);
+}
 
     function selectWingoTab(mode, btnEl) {
         currentWingoMode = normalizeModeKey(mode);
@@ -3556,8 +3576,8 @@
                 const modeKey = normalizeModeKey(result.mode);
                 const room = wingoRooms[modeKey];
                 if (room) {
-                    if (result.periodId) room.period = Number(result.periodId) + 1;
-                    room.timeLeft = room.duration;
+                    if (result.periodId) room.period = (BigInt(String(result.periodId)) + 1n).toString();
+                    if (result.timeLeft !== undefined) room.timeLeft = Number(result.timeLeft);
                     if (typeof result.number === 'number') {
                         room.recentBalls = [result.number, ...(room.recentBalls || [7, 5, 4, 7])].slice(0, 5);
                         const outcome = getNumberOutcome(result.number);
