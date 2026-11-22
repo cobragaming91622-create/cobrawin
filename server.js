@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const fs = require('fs');
 const path = require('path');
+const { MongoClient } = require('mongodb');
 
 const app = express();
 const server = http.createServer(app);
@@ -10,8 +11,11 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'cobra123';
+const MONGODB_URI = process.env.MONGODB_URI || '';
 const DATA_FILE = path.join(__dirname, 'data.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
+
+let dbCollection = null;
 
 app.use(express.json());
 if (fs.existsSync(PUBLIC_DIR)) {
@@ -81,6 +85,15 @@ function loadData() {
 
 function saveData(dbObj) {
     fs.writeFileSync(DATA_FILE, JSON.stringify(dbObj, null, 2));
+    if (dbCollection) {
+        dbCollection
+            .updateOne(
+                { _id: 'cobrawin_state' },
+                { $set: { state: dbObj, updatedAt: new Date() } },
+                { upsert: true }
+            )
+            .catch((err) => console.error('Mongo save error:', err));
+    }
 }
 
 let db = loadData();
@@ -88,53 +101,43 @@ let db = loadData();
 // Har mode ('30s', '1m', '3m', '5m') ki alag state
 const gameState = {};
 Object.keys(WINGO_MODES).forEach((mode) => {
-  const base = BigInt(WINGO_MODES[mode].basePeriod);
-  gameState[mode] = {
-    timeLeft: WINGO_MODES[mode].duration,
-    periodId: base.toString(),
-    activeBets: [],
-    history: [
-      { periodId: (base - 1n).toString(), number: 5, bigSmall: 'Big', color: 'Green' },
-      { periodId: (base - 2n).toString(), number: 7, bigSmall: 'Big', color: 'Green' },
-      { periodId: (base - 3n).toString(), number: 4, bigSmall: 'Small', color: 'Red' },
-      { periodId: (base - 4n).toString(), number: 5, bigSmall: 'Big', color: 'Violet' },
-      { periodId: (base - 5n).toString(), number: 7, bigSmall: 'Big', color: 'Green' }
-    ]
-  };
+    const base = BigInt(WINGO_MODES[mode].basePeriod);
+    gameState[mode] = {
+        timeLeft: WINGO_MODES[mode].duration,
+        periodId: base.toString(),
+        activeBets: [],
+        history: [
+            { periodId: (base - 1n).toString(), number: 5, bigSmall: 'Big', color: 'Green' },
+            { periodId: (base - 2n).toString(), number: 7, bigSmall: 'Big', color: 'Green' },
+            { periodId: (base - 3n).toString(), number: 4, bigSmall: 'Small', color: 'Red' },
+            { periodId: (base - 4n).toString(), number: 5, bigSmall: 'Big', color: 'Violet' },
+            { periodId: (base - 5n).toString(), number: 7, bigSmall: 'Big', color: 'Green' }
+        ]
+    };
 });
+
 function mapWingoModeKey(rawMode) {
-  const key = String(rawMode || '').trim().toLowerCase();
-  if (key === '30sec' || key === '30s') return '30s';
-  if (key === '1min' || key === '1m') return '1m';
-  if (key === '3min' || key === '3m') return '3m';
-  if (key === '5min' || key === '5m') return '5m';
-  return rawMode;
+    const key = String(rawMode || '').trim().toLowerCase();
+    if (key === '30sec' || key === '30s') return '30s';
+    if (key === '1min' || key === '1m') return '1m';
+    if (key === '3min' || key === '3m') return '3m';
+    if (key === '5min' || key === '5m') return '5m';
+    return rawMode;
 }
 
 app.get('/api/wingo/state', (req, res) => {
-  const rawMode = req.query.mode;
-  const mappedMode = mapWingoModeKey(rawMode);
+    const rawMode = req.query.mode;
+    const mappedMode = mapWingoModeKey(rawMode);
 
-  if (mappedMode && gameState[mappedMode]) {
-    return res.json({
-      [rawMode]: gameState[mappedMode],
-      [mappedMode]: gameState[mappedMode]
-    });
-  }
+    if (mappedMode && gameState[mappedMode]) {
+        return res.json({
+            [rawMode]: gameState[mappedMode],
+            [mappedMode]: gameState[mappedMode]
+        });
+    }
 
-  return res.json(gameState);
+    return res.json(gameState);
 });
-// Server ka ek hi master timer (har 1 second chalega)
-setInterval(() => {
-  Object.keys(WINGO_MODES).forEach((mode) => {
-    const state = gameState[mode];
-    if (state.timeLeft > 1) {
-      state.timeLeft -= 1;
-    } else {
-  settleModeRound(mode);
-}
-  });
-}, 1000);
 
 function getOutcome(num) {
     const n = Number(num);
@@ -147,11 +150,15 @@ function getOutcome(num) {
     return { number: n, bigSmall, colors, primaryColor: colors[0] };
 }
 
-function getMultiplier(type, value) {
+function multiplier(type, value) {
     if (type === 'number') return 9.9;
     if (type === 'size') return 1.96;
     if (type === 'color') return String(value).toLowerCase() === 'violet' ? 7.96 : 1.96;
     return 1.96;
+}
+
+function getMultiplier(type, value) {
+    return multiplier(type, value);
 }
 
 function settleModeRound(mode) {
@@ -228,12 +235,13 @@ function settleModeRound(mode) {
     });
 }
 
+// Server ka ek hi master timer (har 1 second chalega)
 setInterval(() => {
     Object.keys(WINGO_MODES).forEach((mode) => {
-        const cfg = WINGO_MODES[mode];
         const st = gameState[mode];
-        st.timeLeft -= 1;
-        if (st.timeLeft <= 0) {
+        if (st.timeLeft > 1) {
+            st.timeLeft -= 1;
+        } else {
             settleModeRound(mode);
         }
         io.emit('timerUpdate', {
@@ -414,7 +422,7 @@ io.on('connection', (socket) => {
     socket.on('loginUser', (userId) => {
         boundUserId = userId;
         if (userId) socket.join(String(userId));
-        socket.emit('initData', {
+        socket.emit('init', {
             periodId: String(gameState['30s'].periodId),
             timeLeft: gameState['30s'].timeLeft,
             history: gameState['30s'].history,
@@ -478,7 +486,36 @@ io.on('connection', (socket) => {
     });
 });
 
-server.listen(PORT, () => {
-    console.log(`Cobra Win Server running on http://localhost:${PORT}`);
-    console.log(`Admin Panel URL: http://localhost:${PORT}/admin.html`);
-});
+async function initStorageAndStart() {
+    if (MONGODB_URI) {
+        try {
+            const client = new MongoClient(MONGODB_URI);
+            await client.connect();
+            const mongoDb = client.db('cobrawin');
+            dbCollection = mongoDb.collection('app_state');
+
+            const doc = await dbCollection.findOne({ _id: 'cobrawin_state' });
+            if (doc && doc.state) {
+                db = {
+                    users: Array.isArray(doc.state.users) ? doc.state.users : [],
+                    deposits: Array.isArray(doc.state.deposits) ? doc.state.deposits : [],
+                    withdrawals: Array.isArray(doc.state.withdrawals) ? doc.state.withdrawals : [],
+                    nextWinGoResults: Object.assign(defaultNextResults(), doc.state.nextWinGoResults || {})
+                };
+                fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
+            } else {
+                saveData(db);
+            }
+            console.log('Connected to MongoDB Atlas');
+        } catch (err) {
+            console.error('MongoDB connection error, falling back to data.json:', err);
+        }
+    }
+
+    server.listen(PORT, () => {
+        console.log(`Cobra Win Server running on http://localhost:${PORT}`);
+        console.log(`Admin Panel URL: http://localhost:${PORT}/admin.html`);
+    });
+}
+
+initStorageAndStart();

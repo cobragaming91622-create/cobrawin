@@ -3595,6 +3595,19 @@ function startWingoRoomsLoop() {
                 }
             }
         });
+        socket.on('roundResult', (data) => {
+  if (!data) return;
+  if (data.newBalance !== undefined && data.newBalance !== null) {
+    if (typeof currentUser !== 'undefined' && currentUser) {
+      currentUser.balance = Number(data.newBalance);
+    }
+    if (typeof renderUserBalance === 'function') {
+      renderUserBalance(Number(data.newBalance));
+    } else if (typeof updateBalanceUI === 'function') {
+      updateBalanceUI(Number(data.newBalance));
+    }
+  }
+});
 
         socket.on('depositStatusUpdated', (payload) => {
             const isTargetUser = currentUser && (
