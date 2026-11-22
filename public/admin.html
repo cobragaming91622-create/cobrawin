@@ -138,6 +138,21 @@
         '5m':  'WinGo 5 Min'
     };
 
+    function escapeHtml(val) {
+        return String(val ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function getUserPhone(u) {
+        const raw = u?.phone ?? u?.mobile ?? u?.phoneNumber ?? u?.number ?? '';
+        const cleaned = String(raw).trim();
+        return cleaned ? cleaned : '—';
+    }
+
     function numberOptionsHtml() {
         return `
             <option value="">Auto Random</option>
@@ -159,7 +174,7 @@
         grid.innerHTML = Object.keys(MODE_LABELS).map((mode) => `
             <div class="mode-card" id="mode-card-${mode}">
                 <div class="mode-head">
-                    <strong>${MODE_LABELS[mode]}</strong>
+                    <strong>${escapeHtml(MODE_LABELS[mode])}</strong>
                     <span class="mode-badge" id="mode-forced-${mode}">AUTO</span>
                 </div>
                 <div class="mode-meta" id="mode-meta-${mode}">
@@ -200,9 +215,9 @@
                 return;
             }
 
-            document.getElementById('st-users').innerText = data.stats.totalUsers;
-            document.getElementById('st-balance').innerText = `₹${Number(data.stats.totalBalance).toFixed(2)}`;
-            document.getElementById('st-deposits').innerText = data.stats.pendingDeposits;
+            document.getElementById('st-users').innerText = Number(data.stats?.totalUsers || 0);
+            document.getElementById('st-balance').innerText = `₹${Number(data.stats?.totalBalance || 0).toFixed(2)}`;
+            document.getElementById('st-deposits').innerText = Number(data.stats?.pendingDeposits || 0);
 
             const modes = data.modes || {};
             Object.keys(MODE_LABELS).forEach((mode) => {
@@ -216,8 +231,8 @@
                 forcedBadge.style.background = isForced ? 'rgba(22,163,74,0.22)' : 'rgba(56,139,253,0.18)';
                 forcedBadge.style.color = isForced ? '#4ade80' : '#60a5fa';
 
-                const lastTxt = info.lastResult ? `${info.lastResult.number} (${info.lastResult.color})` : '—';
-                metaEl.innerHTML = `Period: <strong>${info.periodId}</strong> • Timer: <strong>${info.timeLeft}s</strong><br>Active Bets: <strong>${info.activeBetsCount}</strong> • Last: <strong>${lastTxt}</strong>`;
+                const lastTxt = info.lastResult ? `${escapeHtml(info.lastResult.number)} (${escapeHtml(info.lastResult.color)})` : '—';
+                metaEl.innerHTML = `Period: <strong>${escapeHtml(info.periodId)}</strong> • Timer: <strong>${escapeHtml(info.timeLeft)}s</strong><br>Active Bets: <strong>${escapeHtml(info.activeBetsCount)}</strong> • Last: <strong>${lastTxt}</strong>`;
             });
 
             renderUsers(data.users || []);
@@ -230,40 +245,50 @@
 
     function renderUsers(users) {
         const tbody = document.getElementById('users-tbody');
-        if (!users.length) {
+        if (!Array.isArray(users) || !users.length) {
             tbody.innerHTML = '<tr><td colspan="5" style="color:#8b949e;">No users found.</td></tr>';
             return;
         }
-        tbody.innerHTML = users.map((u) => `
-            <tr>
-                <td>${u.id}</td>
-                <td>${u.phone}</td>
-                <td><strong>₹${Number(u.balance || 0).toFixed(2)}</strong></td>
-                <td><span class="pill ${u.blocked ? 'pill-bad' : 'pill-ok'}">${u.blocked ? 'Blocked' : 'Active'}</span></td>
-                <td><button type="button" class="secondary" onclick="toggleBlock('${u.id}')">${u.blocked ? 'Unblock' : 'Block'}</button></td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = users.map((u) => {
+            const phoneText = getUserPhone(u);
+            const safeId = escapeHtml(u.id);
+            const safePhone = escapeHtml(phoneText);
+            return `
+                <tr>
+                    <td>${safeId}</td>
+                    <td><strong>${safePhone}</strong></td>
+                    <td><strong>₹${Number(u.balance || 0).toFixed(2)}</strong></td>
+                    <td><span class="pill ${u.blocked ? 'pill-bad' : 'pill-ok'}">${u.blocked ? 'Blocked' : 'Active'}</span></td>
+                    <td><button type="button" class="secondary" onclick="toggleBlock('${safeId}')">${u.blocked ? 'Unblock' : 'Block'}</button></td>
+                </tr>
+            `;
+        }).join('');
     }
 
     function renderDeposits(deposits) {
         const tbody = document.getElementById('deposits-tbody');
-        if (!deposits.length) {
+        if (!Array.isArray(deposits) || !deposits.length) {
             tbody.innerHTML = '<tr><td colspan="6" style="color:#8b949e;">No deposit requests yet.</td></tr>';
             return;
         }
         tbody.innerHTML = deposits.map((d) => {
             const cls = d.status === 'Approved' ? 'pill-ok' : (d.status === 'Rejected' ? 'pill-bad' : 'pill-warn');
+            const safeId = escapeHtml(d.id);
+            const safePhone = escapeHtml(d.phone || d.mobile || '—');
+            const safeUserId = escapeHtml(d.userId || '—');
+            const safeUtr = escapeHtml(d.utr || '—');
+            const safeStatus = escapeHtml(d.status || 'Pending');
             const actions = d.status === 'Pending'
-                ? `<button type="button" class="success" onclick="depositAction('${d.id}', 'approve')">Approve</button>
-                   <button type="button" class="danger" onclick="depositAction('${d.id}', 'reject')">Reject</button>`
+                ? `<button type="button" class="success" onclick="depositAction('${safeId}', 'approve')">Approve</button>
+                   <button type="button" class="danger" onclick="depositAction('${safeId}', 'reject')">Reject</button>`
                 : '—';
             return `
                 <tr>
-                    <td>${d.id}</td>
-                    <td>${d.phone} (${d.userId})</td>
-                    <td><strong>₹${Number(d.amount).toFixed(2)}</strong></td>
-                    <td>${d.utr}</td>
-                    <td><span class="pill ${cls}">${d.status}</span></td>
+                    <td>${safeId}</td>
+                    <td>${safePhone} (${safeUserId})</td>
+                    <td><strong>₹${Number(d.amount || 0).toFixed(2)}</strong></td>
+                    <td>${safeUtr}</td>
+                    <td><span class="pill ${cls}">${safeStatus}</span></td>
                     <td>${actions}</td>
                 </tr>
             `;

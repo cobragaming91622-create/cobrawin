@@ -16,6 +16,7 @@ const DATA_FILE = path.join(__dirname, 'data.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
 let dbCollection = null;
+let saveQueue = Promise.resolve();
 
 app.use(express.json());
 if (fs.existsSync(PUBLIC_DIR)) {
@@ -48,49 +49,68 @@ function defaultNextResults() {
     return { '30s': null, '1m': null, '3m': null, '5m': null };
 }
 
+function normalizeUser(u) {
+    const rawPhone = u?.phone ?? u?.mobile ?? u?.phoneNumber ?? u?.number ?? '';
+    return {
+        id: String(u?.id ?? ''),
+        phone: String(rawPhone).trim(),
+        password: String(u?.password ?? ''),
+        balance: Number(Number(u?.balance ?? 0).toFixed(2)),
+        blocked: Boolean(u?.blocked)
+    };
+}
+
+function normalizeState(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const mergedNext = Object.assign(defaultNextResults(), src.nextWinGoResults || {});
+    if (src.nextWinGoResult !== undefined && src.nextWinGoResult !== null && mergedNext['30s'] === null) {
+        mergedNext['30s'] = src.nextWinGoResult;
+    }
+    return {
+        users: Array.isArray(src.users) ? src.users.map(normalizeUser) : [],
+        deposits: Array.isArray(src.deposits) ? src.deposits : [],
+        withdrawals: Array.isArray(src.withdrawals) ? src.withdrawals : [],
+        nextWinGoResults: mergedNext
+    };
+}
+
 function loadData() {
     if (!fs.existsSync(DATA_FILE)) {
-        const initial = {
+        const initial = normalizeState({
             users: [
                 { id: '2789365', phone: '9999999999', password: '123', balance: 395.61, blocked: false }
             ],
             deposits: [],
             withdrawals: [],
             nextWinGoResults: defaultNextResults()
-        };
+        });
         fs.writeFileSync(DATA_FILE, JSON.stringify(initial, null, 2));
         return initial;
     }
     try {
         const parsed = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-        const mergedNext = Object.assign(defaultNextResults(), parsed.nextWinGoResults || {});
-        if (parsed.nextWinGoResult !== undefined && parsed.nextWinGoResult !== null && mergedNext['30s'] === null) {
-            mergedNext['30s'] = parsed.nextWinGoResult;
-        }
-        return {
-            users: Array.isArray(parsed.users) ? parsed.users : [],
-            deposits: Array.isArray(parsed.deposits) ? parsed.deposits : [],
-            withdrawals: Array.isArray(parsed.withdrawals) ? parsed.withdrawals : [],
-            nextWinGoResults: mergedNext
-        };
+        return normalizeState(parsed);
     } catch (e) {
-        return {
-            users: [],
-            deposits: [],
-            withdrawals: [],
-            nextWinGoResults: defaultNextResults()
-        };
+        return normalizeState({});
     }
 }
 
 function saveData(dbObj) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(dbObj, null, 2));
+    const snapshot = normalizeState(dbObj);
+    try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(snapshot, null, 2));
+    } catch (err) {
+        console.error('Local file write error:', err);
+    }
+
     if (dbCollection) {
-        dbCollection
-            .updateOne(
-                { _id: 'cobrawin_state' },
-                { $set: { state: dbObj, updatedAt: new Date() } },
-                { upsert: true }
+        saveQueue = saveQueue
+            .then(() =>
+                dbCollection.updateOne(
+                    { _id: 'cobrawin_state' },
+                    { $set: { state: snapshot, updatedAt: new Date() } },
+                    { upsert: true }
+                )
             )
             .catch((err) => console.error('Mongo save error:', err));
     }
@@ -198,6 +218,7 @@ function settleModeRound(mode) {
     });
     if (st.history.length > 50) st.history.pop();
 
+    let balanceChanged = false;
     userWins.forEach((entry) => {
         let updatedBalance = null;
         if (entry.userId) {
@@ -205,6 +226,7 @@ function settleModeRound(mode) {
             if (u) {
                 u.balance = Number((Number(u.balance || 0) + entry.totalWon).toFixed(2));
                 updatedBalance = u.balance;
+                balanceChanged = true;
             }
         }
         if (entry.socketId) {
@@ -220,8 +242,11 @@ function settleModeRound(mode) {
 
     if (forced !== null && forced !== undefined) {
         db.nextWinGoResults[mode] = null;
+        balanceChanged = true;
     }
-    saveData(db);
+    if (balanceChanged) {
+        saveData(db);
+    }
 
     st.activeBets = [];
     st.periodId = (BigInt(st.periodId) + 1n).toString();
@@ -260,17 +285,19 @@ setInterval(() => {
 // Auth Routes
 app.post('/api/signup', (req, res) => {
     const { phone, password } = req.body || {};
-    if (!phone || !password) {
+    const cleanPhone = String(phone || '').trim();
+    const cleanPassword = String(password || '');
+    if (!cleanPhone || !cleanPassword) {
         return res.json({ success: false, message: 'Phone and password are required.' });
     }
-    const exists = db.users.find((u) => u.phone === phone);
+    const exists = db.users.find((u) => String(u.phone).trim() === cleanPhone);
     if (exists) {
         return res.json({ success: false, message: 'Phone number already registered!' });
     }
     const newUser = {
         id: String(Math.floor(1000000 + Math.random() * 9000000)),
-        phone,
-        password,
+        phone: cleanPhone,
+        password: cleanPassword,
         balance: 28.0,
         blocked: false
     };
@@ -281,7 +308,9 @@ app.post('/api/signup', (req, res) => {
 
 app.post('/api/login', (req, res) => {
     const { phone, password } = req.body || {};
-    const user = db.users.find((u) => u.phone === phone && u.password === password);
+    const cleanPhone = String(phone || '').trim();
+    const cleanPassword = String(password || '');
+    const user = db.users.find((u) => String(u.phone).trim() === cleanPhone && u.password === cleanPassword);
     if (!user) {
         return res.json({ success: false, message: 'Invalid phone or password!' });
     }
@@ -301,7 +330,17 @@ function checkAdmin(req, res, next) {
 }
 
 app.get('/api/admin/overview', checkAdmin, (req, res) => {
-    const totalBalance = db.users.reduce((sum, u) => sum + Number(u.balance || 0), 0);
+    const safeUsers = db.users.map((u) => {
+        const norm = normalizeUser(u);
+        return {
+            id: norm.id,
+            phone: norm.phone || '—',
+            balance: norm.balance,
+            blocked: norm.blocked
+        };
+    });
+
+    const totalBalance = safeUsers.reduce((sum, u) => sum + Number(u.balance || 0), 0);
     const modesSummary = {};
     Object.keys(WINGO_MODES).forEach((m) => {
         modesSummary[m] = {
@@ -316,13 +355,13 @@ app.get('/api/admin/overview', checkAdmin, (req, res) => {
     res.json({
         success: true,
         stats: {
-            totalUsers: db.users.length,
+            totalUsers: safeUsers.length,
             totalBalance: Number(totalBalance.toFixed(2)),
             pendingDeposits: db.deposits.filter((d) => d.status === 'Pending').length,
             pendingWithdrawals: db.withdrawals.filter((w) => w.status === 'Pending').length
         },
         modes: modesSummary,
-        users: db.users,
+        users: safeUsers,
         deposits: db.deposits,
         withdrawals: db.withdrawals
     });
@@ -357,7 +396,8 @@ app.post('/api/admin/set-result', checkAdmin, (req, res) => {
 app.post('/api/admin/adjust-balance', checkAdmin, (req, res) => {
     const { userId, amount } = req.body || {};
     const delta = Number(amount);
-    const user = db.users.find((u) => String(u.id) === String(userId) || u.phone === userId);
+    const lookup = String(userId || '').trim();
+    const user = db.users.find((u) => String(u.id) === lookup || String(u.phone).trim() === lookup);
     if (!user || Number.isNaN(delta)) {
         return res.json({ success: false, message: 'User not found or invalid amount' });
     }
@@ -383,7 +423,7 @@ app.post('/api/deposit-request', (req, res) => {
     const reqItem = {
         id: 'DEP' + Date.now(),
         userId: userId || 'guest',
-        phone: phone || 'N/A',
+        phone: String(phone || '').trim() || 'N/A',
         amount: amt,
         method: method || 'UPI QR',
         utr: utr || 'N/A',
@@ -403,7 +443,9 @@ app.post('/api/admin/deposit-action', checkAdmin, (req, res) => {
     }
     if (action === 'approve') {
         item.status = 'Approved';
-        const user = db.users.find((u) => String(u.id) === String(item.userId) || u.phone === item.phone);
+        const user = db.users.find(
+            (u) => String(u.id) === String(item.userId) || String(u.phone).trim() === String(item.phone).trim()
+        );
         if (user) {
             user.balance = Number((Number(user.balance || 0) + Number(item.amount)).toFixed(2));
             io.to(String(user.id)).emit('balanceUpdate', user.balance);
@@ -474,7 +516,7 @@ io.on('connection', (socket) => {
         const item = {
             id: 'WD' + Date.now(),
             userId: (wdData && wdData.userId) || boundUserId || 'guest',
-            phone: (wdData && wdData.phone) || 'N/A',
+            phone: String((wdData && wdData.phone) || '').trim() || 'N/A',
             amount: amt,
             method: (wdData && wdData.method) || 'UPI',
             details: (wdData && wdData.details) || '',
@@ -496,12 +538,8 @@ async function initStorageAndStart() {
 
             const doc = await dbCollection.findOne({ _id: 'cobrawin_state' });
             if (doc && doc.state) {
-                db = {
-                    users: Array.isArray(doc.state.users) ? doc.state.users : [],
-                    deposits: Array.isArray(doc.state.deposits) ? doc.state.deposits : [],
-                    withdrawals: Array.isArray(doc.state.withdrawals) ? doc.state.withdrawals : [],
-                    nextWinGoResults: Object.assign(defaultNextResults(), doc.state.nextWinGoResults || {})
-                };
+                const loadedState = normalizeState(doc.state);
+                Object.assign(db, loadedState);
                 fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
             } else {
                 saveData(db);
