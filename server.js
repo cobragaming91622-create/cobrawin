@@ -282,35 +282,47 @@ setInterval(() => {
     });
 }, 1000);
 
-// Auth Routes
-app.post('/api/signup', (req, res) => {
-    const { phone, password } = req.body || {};
-    const cleanPhone = String(phone || '').trim();
-    const cleanPassword = String(password || '');
+// Auth Routes (/api/signup aur /api/register dono supported)
+function handleSignup(req, res) {
+    const body = req.body || {};
+    const rawPhone = body.phone ?? body.mobile ?? body.phoneNumber ?? body.number ?? '';
+    const cleanPhone = String(rawPhone).trim();
+    const cleanPassword = String(body.password ?? body.pass ?? '');
+
     if (!cleanPhone || !cleanPassword) {
-        return res.json({ success: false, message: 'Phone and password are required.' });
+        return res.status(400).json({ success: false, message: 'Phone and password are required.' });
     }
+
     const exists = db.users.find((u) => String(u.phone).trim() === cleanPhone);
     if (exists) {
         return res.json({ success: false, message: 'Phone number already registered!' });
     }
-    const newUser = {
+
+    const newUser = normalizeUser({
         id: String(Math.floor(1000000 + Math.random() * 9000000)),
         phone: cleanPhone,
         password: cleanPassword,
         balance: 28.0,
         blocked: false
-    };
+    });
+
     db.users.push(newUser);
     saveData(db);
     res.json({ success: true, user: newUser });
-});
+}
+
+app.post('/api/signup', handleSignup);
+app.post('/api/register', handleSignup);
 
 app.post('/api/login', (req, res) => {
-    const { phone, password } = req.body || {};
-    const cleanPhone = String(phone || '').trim();
-    const cleanPassword = String(password || '');
-    const user = db.users.find((u) => String(u.phone).trim() === cleanPhone && u.password === cleanPassword);
+    const body = req.body || {};
+    const rawPhone = body.phone ?? body.mobile ?? body.phoneNumber ?? body.number ?? '';
+    const cleanPhone = String(rawPhone).trim();
+    const cleanPassword = String(body.password ?? body.pass ?? '');
+
+    const user = db.users.find(
+        (u) => String(u.phone).trim() === cleanPhone && String(u.password) === cleanPassword
+    );
     if (!user) {
         return res.json({ success: false, message: 'Invalid phone or password!' });
     }
