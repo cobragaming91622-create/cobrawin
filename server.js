@@ -489,7 +489,15 @@ io.on('connection', (socket) => {
     });
 
     socket.on('placeBet', (betData) => {
-        const mode = WINGO_MODES[betData && betData.mode] ? betData.mode : '30s';
+        const rawMode = String((betData && betData.mode) || '').trim().toLowerCase();
+        const modeAlias = {
+            '30s': '30s', '30sec': '30s',
+            '1m': '1m', '1min': '1m',
+            '3m': '3m', '3min': '3m',
+            '5m': '5m', '5min': '5m'
+        };
+        const mappedKey = modeAlias[rawMode] || (betData && betData.mode);
+        const mode = WINGO_MODES[mappedKey] ? mappedKey : (WINGO_MODES[rawMode] ? rawMode : '30s');
         const st = gameState[mode];
         if (st.timeLeft <= 5) {
             return socket.emit('betError', `Betting closed for ${mode} period!`);
