@@ -3390,30 +3390,20 @@ function startWingoRoomsLoop() {
         depositHistory.unshift(record);
         renderDepositHistory();
 
-        if (socket && currentUser) {
-            socket.emit('submitDepositRequest', {
-                userId: currentUser.id,
-                phone: currentUser.phone,
+      try {
+        await fetch('/api/deposit-request', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: currentUser ? currentUser.id : 'guest',
+                phone: currentUser ? currentUser.phone : '',
                 amount: selectedDepositAmount,
                 utr,
                 method: `${selectedPaymentMethod} (${selectedGwApp})`,
                 channel
-            });
-        } else {
-           try {
-    await fetch('/api/deposit-request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            userId: currentUser ? currentUser.id : 'guest',
-            phone: currentUser ? currentUser.phone : '',
-            amount: selectedDepositAmount,
-            utr,
-            method: `${selectedPaymentMethod} (${selectedGwApp})`,
-            channel
-        })
-      });
-      } catch (_) {}
+            })
+        });
+    } catch (_) {}
         }
 
         document.getElementById('gw-active-view').style.display = 'none';
