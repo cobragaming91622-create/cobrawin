@@ -3400,19 +3400,20 @@ function startWingoRoomsLoop() {
                 channel
             });
         } else {
-            try {
-                await fetch('/api/deposits', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        userId: currentUser ? currentUser.id : 'guest',
-                        amount: selectedDepositAmount,
-                        utr,
-                        method: `${selectedPaymentMethod} (${selectedGwApp})`,
-                        channel
-                    })
-                });
-            } catch (_) {}
+           try {
+    await fetch('/api/deposit-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            userId: currentUser ? currentUser.id : 'guest',
+            phone: currentUser ? currentUser.phone : '',
+            amount: selectedDepositAmount,
+            utr,
+            method: `${selectedPaymentMethod} (${selectedGwApp})`,
+            channel
+        })
+      });
+      } catch (_) {}
         }
 
         document.getElementById('gw-active-view').style.display = 'none';
