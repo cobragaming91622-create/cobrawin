@@ -4011,6 +4011,755 @@ function startWingoRoomsLoop() {
 
     loadRememberedAuth();
 </script>
+<!-- ==================== COBRA WIN WITHDRAW PAGE ==================== -->
+<style>
+  #cw-withdraw-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9990;
+    display: none;
+    flex-direction: column;
+    background: #0b1224;
+    color: #ffffff;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    overflow-y: auto;
+    padding-bottom: 36px;
+  }
+  #cw-withdraw-overlay.active {
+    display: flex;
+  }
+  .cw-wd-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: rgba(11, 18, 36, 0.96);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(8px);
+  }
+  .cw-wd-back, .cw-wd-hist-btn {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .cw-wd-title {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .cw-wd-wrap {
+    max-width: 520px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 14px 14px 28px;
+  }
+  .cw-balance-card {
+    background: linear-gradient(135deg, #1d63ff 0%, #10358c 100%);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 10px 24px rgba(16, 53, 140, 0.35);
+    margin-bottom: 14px;
+  }
+  .cw-bal-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.9);
+  }
+  .cw-bal-amount-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 10px 0 6px;
+  }
+  .cw-bal-amount {
+    font-size: 28px;
+    font-weight: 800;
+  }
+  .cw-refresh-btn {
+    background: rgba(255, 255, 255, 0.16);
+    border: none;
+    color: #fff;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .cw-card-dots {
+    font-size: 13px;
+    letter-spacing: 2px;
+    opacity: 0.75;
+  }
+  .cw-method-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .cw-method-tab {
+    background: #14203b;
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px 8px;
+    text-align: center;
+    cursor: pointer;
+    color: #b8c7e8;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .cw-method-tab.active {
+    background: linear-gradient(180deg, #1c4ec7 0%, #122c6b 100%);
+    border-color: #4ea1ff;
+    color: #ffffff;
+  }
+  .cw-method-icon {
+    font-size: 20px;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .cw-panel {
+    background: #14203b;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .cw-account-box {
+    background: #0d162b;
+    border: 1px dashed rgba(94, 168, 255, 0.45);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+    cursor: pointer;
+  }
+  .cw-warn-text {
+    color: #ff6b7a;
+    font-size: 12px;
+    margin-top: 6px;
+  }
+  .cw-chip-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin: 10px 0 12px;
+  }
+  .cw-chip {
+    background: #0d162b;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    color: #e6eefc;
+    border-radius: 8px;
+    padding: 9px 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .cw-chip.active {
+    background: #1d63ff;
+    border-color: #6ab0ff;
+    color: #fff;
+  }
+  .cw-input-wrap {
+    display: flex;
+    align-items: center;
+    background: #0d162b;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+  }
+  .cw-input-prefix {
+    color: #5ca4ff;
+    font-weight: 700;
+    margin-right: 8px;
+  }
+  .cw-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #fff;
+    font-size: 15px;
+  }
+  .cw-row-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #b5c5e4;
+    margin-bottom: 8px;
+  }
+  .cw-all-btn {
+    background: rgba(29, 99, 255, 0.22);
+    color: #6ab0ff;
+    border: 1px solid rgba(106, 176, 255, 0.4);
+    border-radius: 6px;
+    padding: 3px 9px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .cw-submit-btn {
+    width: 100%;
+    padding: 13px;
+    border: none;
+    border-radius: 24px;
+    background: linear-gradient(90deg, #2b7bff 0%, #1549c4 100%);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .cw-rules {
+    margin-top: 12px;
+    font-size: 12px;
+    color: #9db0d4;
+    line-height: 1.65;
+  }
+  .cw-hist-card {
+    background: #14203b;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 10px;
+    font-size: 12px;
+  }
+  .cw-hist-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .cw-badge-wd {
+    background: #1ea85a;
+    color: #fff;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+  }
+  .cw-status-ok { color: #36d67c; font-weight: 700; }
+  .cw-status-pending { color: #ffbe3b; font-weight: 700; }
+  .cw-status-rej { color: #ff6273; font-weight: 700; }
 
+  /* Sub-modal for Bank / UPI */
+  .cw-submodal {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(3, 7, 18, 0.78);
+    padding: 16px;
+  }
+  .cw-submodal.active { display: flex; }
+  .cw-submodal-box {
+    width: 100%;
+    max-width: 420px;
+    background: #14203b;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .cw-field {
+    width: 100%;
+    background: #0d162b;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    padding: 10px;
+    color: #fff;
+    margin-bottom: 10px;
+    font-size: 13px;
+  }
+  .cw-lock-banner {
+    background: rgba(255, 190, 59, 0.12);
+    border: 1px solid rgba(255, 190, 59, 0.45);
+    color: #ffd369;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12px;
+    margin-bottom: 12px;
+    display: none;
+  }
+</style>
+
+<div id="cw-withdraw-overlay" role="dialog" aria-label="Withdraw Page">
+  <div class="cw-wd-topbar">
+    <button type="button" class="cw-wd-back" onclick="closeCobraWithdrawPage()">&lt; Back</button>
+    <div class="cw-wd-title">Withdraw</div>
+    <button type="button" class="cw-wd-hist-btn" onclick="scrollToCwHistory()">Withdrawal history</button>
+  </div>
+
+  <div class="cw-wd-wrap">
+    <div id="cw-approval-notice" class="cw-lock-banner">
+      ₹500 approval / requirement pending: Jab ₹500 ka withdrawal approve ho jayega (ya ₹500 requirement poori hogi), tab withdrawal process smoothly unlock ho jayega.
+    </div>
+
+    <div class="cw-balance-card">
+      <div class="cw-bal-top">
+        <span>💼 Available balance</span>
+        <span>Cobra Win</span>
+      </div>
+      <div class="cw-bal-amount-row">
+        <span id="cw-avail-balance" class="cw-bal-amount">₹0.00</span>
+        <button type="button" class="cw-refresh-btn" onclick="refreshCwBalance()" title="Refresh">↻</button>
+      </div>
+      <div class="cw-card-dots">•••• ••••</div>
+    </div>
+
+    <!-- 3 Tabs: BANK CARD, UPI, USDT -->
+    <div class="cw-method-tabs">
+      <button type="button" id="cw-tab-BANK" class="cw-method-tab active" onclick="switchCwMethod('BANK')">
+        <span class="cw-method-icon">🏦</span>
+        BANK CARD
+      </button>
+      <button type="button" id="cw-tab-UPI" class="cw-method-tab" onclick="switchCwMethod('UPI')">
+        <span class="cw-method-icon">⚡</span>
+        UPI
+      </button>
+      <button type="button" id="cw-tab-USDT" class="cw-method-tab" onclick="switchCwMethod('USDT')">
+        <span class="cw-method-icon">₮</span>
+        USDT
+      </button>
+    </div>
+
+    <!-- Bank / UPI Account Box -->
+    <div id="cw-account-section" class="cw-panel">
+      <div id="cw-selected-account-card" class="cw-account-box" onclick="openCwAccountModal()">
+        <div id="cw-account-summary" style="font-weight:700;font-size:14px;">+ Add a bank account number</div>
+        <div id="cw-account-sub" style="font-size:12px;color:#9db0d4;margin-top:4px;">Tap here to add or select account</div>
+      </div>
+      <div id="cw-account-warning" class="cw-warn-text">Need to add beneficiary information to be able to withdraw money</div>
+    </div>
+
+    <!-- USDT Chips -->
+    <div id="cw-usdt-section" class="cw-panel" style="display:none;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:6px;">Select amount of USDT</div>
+      <div class="cw-chip-grid" id="cw-usdt-chips"></div>
+      <div id="cw-usdt-rate-info" style="font-size:12px;color:#9db0d4;">Rate: 1 USDT ≈ ₹92.00</div>
+    </div>
+
+    <!-- Amount & Rules -->
+    <div class="cw-panel">
+      <div class="cw-chip-grid" id="cw-inr-chips"></div>
+
+      <div class="cw-input-wrap">
+        <span class="cw-input-prefix">₹</span>
+        <input id="cw-wd-amount" class="cw-input" type="number" min="100" step="any" placeholder="Please enter the amount" oninput="updateCwReceivePreview()" />
+      </div>
+
+      <div id="cw-usdt-convert-row" class="cw-row-meta" style="display:none;">
+        <span>Estimated USDT</span>
+        <strong id="cw-usdt-est">0.00 USDT</strong>
+      </div>
+
+      <div class="cw-row-meta">
+        <span>Withdrawable balance <strong id="cw-withdrawable-bal">₹0.00</strong></span>
+        <button type="button" class="cw-all-btn" onclick="setCwAllAmount()">All</button>
+      </div>
+
+      <div class="cw-row-meta">
+        <span>Withdrawal amount received</span>
+        <strong id="cw-receive-amt" style="color:#ffbe3b;">₹0.00</strong>
+      </div>
+
+      <button type="button" id="cw-submit-wd-btn" class="cw-submit-btn" onclick="submitCwWithdrawal()">Withdraw</button>
+
+      <div class="cw-rules">
+        <div>• Need to bet ₹0.00</div>
+        <div>• Withdrawal time 00:00-23:55</div>
+        <div>• Inday Remaining Withdrawal Times 3</div>
+        <div id="cw-range-rule">• Withdrawal amount range ₹110.00-₹10,000,000.00</div>
+      </div>
+    </div>
+
+    <!-- Withdrawal History -->
+    <div id="cw-history-section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <strong style="font-size:15px;">Withdrawal history</strong>
+        <span style="font-size:12px;color:#6ab0ff;">Recent</span>
+      </div>
+      <div id="cw-history-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Sub-modal: Add Bank / Add UPI -->
+<div id="cw-submodal" class="cw-submodal">
+  <div class="cw-submodal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <strong id="cw-submodal-title" style="font-size:15px;">Add payment method</strong>
+      <button type="button" onclick="closeCwSubmodal()" style="background:none;border:none;color:#fff;font-size:18px;cursor:pointer;">✕</button>
+    </div>
+
+    <div id="cw-bank-fields">
+      <input id="cw-bank-name" class="cw-field" type="text" placeholder="Choose a bank (e.g. State Bank of India)" />
+      <input id="cw-holder-name" class="cw-field" type="text" placeholder="Full recipient's name" />
+      <input id="cw-acc-number" class="cw-field" type="text" placeholder="Bank account number" />
+      <input id="cw-bank-phone" class="cw-field" type="tel" placeholder="Phone number" />
+      <input id="cw-ifsc-code" class="cw-field" type="text" placeholder="IFSC code" />
+    </div>
+
+    <div id="cw-upi-fields" style="display:none;">
+      <input id="cw-upi-holder" class="cw-field" type="text" placeholder="UPI Name / Account holder name" />
+      <input id="cw-upi-phone" class="cw-field" type="tel" placeholder="Phone Number" />
+      <input id="cw-upi-id" class="cw-field" type="text" placeholder="UPI ID (e.g. name@ybl)" />
+      <input id="cw-upi-confirm" class="cw-field" type="text" placeholder="Confirm UPI ID" />
+    </div>
+
+    <button type="button" class="cw-submit-btn" onclick="saveCwPaymentMethod()">Save</button>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const CW_STORAGE_KEY = 'cw_withdraw_state_v1';
+    const CW_USDT_RATE = 92;
+    let cwMethod = 'BANK';
+    let cwState = loadCwState();
+
+    function loadCwState() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(CW_STORAGE_KEY) || '{}');
+        return {
+          bank: raw.bank || null,
+          upi: raw.upi || null,
+          history: Array.isArray(raw.history) ? raw.history : [],
+          unlocked500: Boolean(raw.unlocked500)
+        };
+      } catch (_) {
+        return { bank: null, upi: null, history: [], unlocked500: false };
+      }
+    }
+
+    function saveCwState() {
+      localStorage.setItem(CW_STORAGE_KEY, JSON.stringify(cwState));
+    }
+
+    function getCwCurrentBalance() {
+      if (typeof currentUser !== 'undefined' && currentUser && typeof currentUser.balance !== 'undefined') {
+        return Number(currentUser.balance) || 0;
+      }
+      const domBal = document.querySelector('[data-balance], .user-balance, #user-balance');
+      if (domBal) {
+        const num = parseFloat(String(domBal.textContent || '').replace(/[^0-9.]/g, ''));
+        if (!Number.isNaN(num)) return num;
+      }
+      return 0;
+    }
+
+    function isCw500Unlocked() {
+      if (cwState.unlocked500) return true;
+      const reqAmt = (typeof REQUIRED_DEPOSIT_FOR_WITHDRAW !== 'undefined')
+        ? Number(REQUIRED_DEPOSIT_FOR_WITHDRAW) || 500
+        : 500;
+      const hasApproved500 = cwState.history.some(
+        (h) => Number(h.amount) >= reqAmt && /approv|complet|success|paid/i.test(String(h.status || ''))
+      );
+      if (hasApproved500) {
+        cwState.unlocked500 = true;
+        saveCwState();
+        return true;
+      }
+      return false;
+    }
+
+    window.unlockCwWithdrawAfter500Approval = function () {
+      cwState.unlocked500 = true;
+      saveCwState();
+      renderCwWithdrawUI();
+    };
+
+    window.openCobraWithdrawPage = function () {
+      document.getElementById('cw-withdraw-overlay').classList.add('active');
+      renderCwWithdrawUI();
+    };
+
+    window.closeCobraWithdrawPage = function () {
+      document.getElementById('cw-withdraw-overlay').classList.remove('active');
+    };
+
+    window.refreshCwBalance = function () {
+      if (typeof socket !== 'undefined' && socket && typeof currentUser !== 'undefined' && currentUser && currentUser.id) {
+        socket.emit('loginUser', currentUser.id);
+      }
+      renderCwWithdrawUI();
+    };
+
+    window.switchCwMethod = function (method) {
+      cwMethod = method;
+      ['BANK', 'UPI', 'USDT'].forEach((m) => {
+        const tab = document.getElementById('cw-tab-' + m);
+        if (tab) tab.classList.toggle('active', m === method);
+      });
+      document.getElementById('cw-account-section').style.display = method === 'USDT' ? 'none' : 'block';
+      document.getElementById('cw-usdt-section').style.display = method === 'USDT' ? 'block' : 'none';
+      document.getElementById('cw-usdt-convert-row').style.display = method === 'USDT' ? 'flex' : 'none';
+      renderCwChipsAndRange();
+      renderCwAccountCard();
+      updateCwReceivePreview();
+    };
+
+    function renderCwChipsAndRange() {
+      const chipWrap = document.getElementById('cw-inr-chips');
+      const rangeRule = document.getElementById('cw-range-rule');
+      const presets = cwMethod === 'UPI'
+        ? [500, 1000, 2000, 3000, 5000, 10000, 30000, 50000]
+        : [110, 300, 500, 1000, 2000, 3000, 5000, 10000];
+
+      rangeRule.textContent = cwMethod === 'USDT'
+        ? '• Withdrawal amount range ₹1,030.00-₹10,000,000.00'
+        : `• Withdrawal amount range ₹${presets[0]}.00-₹10,000,000.00`;
+
+      chipWrap.innerHTML = presets.map((amt) => {
+        const label = amt >= 1000 ? (amt / 1000) + 'K' : String(amt);
+        return `<button type="button" class="cw-chip" onclick="selectCwPreset(${amt}, this)">${label}</button>`;
+      }).join('');
+
+      const usdtWrap = document.getElementById('cw-usdt-chips');
+      const usdtPresets = [10, 30, 50, 70, 100, 200, 1000, 2000];
+      usdtWrap.innerHTML = usdtPresets.map((u) => {
+        const lbl = u >= 1000 ? (u / 1000) + 'K' : String(u);
+        return `<button type="button" class="cw-chip" onclick="selectCwUsdt(${u}, this)">${lbl}</button>`;
+      }).join('');
+    }
+
+    window.selectCwPreset = function (amt, btn) {
+      document.querySelectorAll('#cw-inr-chips .cw-chip').forEach((b) => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      document.getElementById('cw-wd-amount').value = amt;
+      updateCwReceivePreview();
+    };
+
+    window.selectCwUsdt = function (usdtAmt, btn) {
+      document.querySelectorAll('#cw-usdt-chips .cw-chip').forEach((b) => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      document.getElementById('cw-wd-amount').value = Math.round(usdtAmt * CW_USDT_RATE);
+      updateCwReceivePreview();
+    };
+
+    window.setCwAllAmount = function () {
+      const bal = Math.floor(getCwCurrentBalance());
+      document.getElementById('cw-wd-amount').value = bal > 0 ? bal : 0;
+      updateCwReceivePreview();
+    };
+
+    window.updateCwReceivePreview = function () {
+      const amt = Math.max(0, Number(document.getElementById('cw-wd-amount').value) || 0);
+      const fee = amt > 0 ? Math.min(amt * 0.02, 50) : 0;
+      const received = Math.max(0, amt - fee);
+      document.getElementById('cw-receive-amt').textContent = '₹' + received.toFixed(2);
+      document.getElementById('cw-usdt-est').textContent = (amt / CW_USDT_RATE).toFixed(2) + ' USDT';
+    };
+
+    function renderCwAccountCard() {
+      const summary = document.getElementById('cw-account-summary');
+      const sub = document.getElementById('cw-account-sub');
+      const warn = document.getElementById('cw-account-warning');
+
+      if (cwMethod === 'BANK') {
+        if (cwState.bank) {
+          const acc = String(cwState.bank.accountNumber || '');
+          const masked = acc.length > 4 ? ('****' + acc.slice(-4)) : acc;
+          summary.textContent = `${cwState.bank.bankName} | ${masked}`;
+          sub.textContent = `${cwState.bank.holderName} • IFSC: ${cwState.bank.ifsc} (Tap to edit)`;
+          warn.style.display = 'none';
+        } else {
+          summary.textContent = '+ Add a bank account number';
+          sub.textContent = 'Tap here to add bank details';
+          warn.style.display = 'block';
+        }
+      } else if (cwMethod === 'UPI') {
+        if (cwState.upi) {
+          summary.textContent = `UPI: ${cwState.upi.upiId}`;
+          sub.textContent = `${cwState.upi.holderName} • ${cwState.upi.phone} (Tap to edit)`;
+          warn.style.display = 'none';
+        } else {
+          summary.textContent = '+ Add UPI payment method';
+          sub.textContent = 'Tap here to add UPI ID';
+          warn.style.display = 'block';
+        }
+      }
+    }
+
+    window.openCwAccountModal = function () {
+      const isUpi = cwMethod === 'UPI';
+      document.getElementById('cw-submodal-title').textContent = isUpi ? 'Add payment method (UPI)' : 'Add a bank account number';
+      document.getElementById('cw-bank-fields').style.display = isUpi ? 'none' : 'block';
+      document.getElementById('cw-upi-fields').style.display = isUpi ? 'block' : 'none';
+
+      if (!isUpi && cwState.bank) {
+        document.getElementById('cw-bank-name').value = cwState.bank.bankName || '';
+        document.getElementById('cw-holder-name').value = cwState.bank.holderName || '';
+        document.getElementById('cw-acc-number').value = cwState.bank.accountNumber || '';
+        document.getElementById('cw-bank-phone').value = cwState.bank.phone || '';
+        document.getElementById('cw-ifsc-code').value = cwState.bank.ifsc || '';
+      } else if (isUpi && cwState.upi) {
+        document.getElementById('cw-upi-holder').value = cwState.upi.holderName || '';
+        document.getElementById('cw-upi-phone').value = cwState.upi.phone || '';
+        document.getElementById('cw-upi-id').value = cwState.upi.upiId || '';
+        document.getElementById('cw-upi-confirm').value = cwState.upi.upiId || '';
+      }
+      document.getElementById('cw-submodal').classList.add('active');
+    };
+
+    window.closeCwSubmodal = function () {
+      document.getElementById('cw-submodal').classList.remove('active');
+    };
+
+    window.saveCwPaymentMethod = function () {
+      if (cwMethod === 'UPI') {
+        const holderName = document.getElementById('cw-upi-holder').value.trim();
+        const phone = document.getElementById('cw-upi-phone').value.trim();
+        const upiId = document.getElementById('cw-upi-id').value.trim();
+        const confirmId = document.getElementById('cw-upi-confirm').value.trim();
+        if (!upiId || upiId !== confirmId) {
+          alert('UPI ID aur Confirm UPI ID same hona chahiye.');
+          return;
+        }
+        cwState.upi = { holderName: holderName || 'UPI User', phone, upiId };
+      } else {
+        const bankName = document.getElementById('cw-bank-name').value.trim();
+        const holderName = document.getElementById('cw-holder-name').value.trim();
+        const accountNumber = document.getElementById('cw-acc-number').value.trim();
+        const phone = document.getElementById('cw-bank-phone').value.trim();
+        const ifsc = document.getElementById('cw-ifsc-code').value.trim().toUpperCase();
+        if (!bankName || !accountNumber) {
+          alert('Bank name aur account number fill karein.');
+          return;
+        }
+        cwState.bank = { bankName, holderName: holderName || 'Account Holder', accountNumber, phone, ifsc };
+      }
+      saveCwState();
+      closeCwSubmodal();
+      renderCwAccountCard();
+    };
+
+    window.submitCwWithdrawal = function () {
+      const amt = Number(document.getElementById('cw-wd-amount').value) || 0;
+      const bal = getCwCurrentBalance();
+      if (amt < 100) {
+        alert('Minimum withdrawal amount ₹100 hai.');
+        return;
+      }
+      if (amt > bal) {
+        alert('Available balance se zyada amount withdraw nahi ho sakta.');
+        return;
+      }
+      let details = 'USDT Wallet';
+      if (cwMethod === 'BANK') {
+        if (!cwState.bank) {
+          alert('Pehle bank account add karein.');
+          return;
+        }
+        details = `${cwState.bank.bankName} (${cwState.bank.accountNumber})`;
+      } else if (cwMethod === 'UPI') {
+        if (!cwState.upi) {
+          alert('Pehle UPI ID add karein.');
+          return;
+        }
+        details = cwState.upi.upiId;
+      }
+
+      const uid = (typeof currentUser !== 'undefined' && currentUser && currentUser.id) ? currentUser.id : 'guest';
+      const phone = (cwState.upi && cwState.upi.phone) || (cwState.bank && cwState.bank.phone) || (currentUser && currentUser.phone) || '';
+      const orderId = 'WD' + Date.now();
+
+      const record = {
+        id: orderId,
+        amount: amt,
+        method: cwMethod === 'BANK' ? 'BANK CARD' : cwMethod,
+        details,
+        status: 'Pending',
+        time: new Date().toLocaleString()
+      };
+      cwState.history.unshift(record);
+      saveCwState();
+
+      if (typeof socket !== 'undefined' && socket) {
+        socket.emit('submitWithdrawRequest', {
+          userId: uid,
+          phone,
+          amount: amt,
+          method: record.method,
+          details
+        });
+      }
+
+      document.getElementById('cw-wd-amount').value = '';
+      updateCwReceivePreview();
+      renderCwHistory();
+      alert('Withdrawal request submit ho gayi hai!');
+    };
+
+    function renderCwHistory() {
+      const list = document.getElementById('cw-history-list');
+      if (!cwState.history.length) {
+        list.innerHTML = '<div style="color:#9db0d4;font-size:12px;">Abhi koi withdrawal record nahi hai.</div>';
+        return;
+      }
+      list.innerHTML = cwState.history.map((item) => {
+        const stLower = String(item.status || '').toLowerCase();
+        const cls = /approv|complet|success|paid/.test(stLower)
+          ? 'cw-status-ok'
+          : (/reject|fail|cancel/.test(stLower) ? 'cw-status-rej' : 'cw-status-pending');
+        return `
+          <div class="cw-hist-card">
+            <div class="cw-hist-top">
+              <span class="cw-badge-wd">Withdraw</span>
+              <span class="${cls}">${item.status}</span>
+            </div>
+            <div>Balance: <strong style="color:#ffbe3b;">₹${Number(item.amount || 0).toFixed(2)}</strong></div>
+            <div>Type: ${item.method} (${item.details || ''})</div>
+            <div>Time: ${item.time}</div>
+            <div style="color:#8ea3c9;">Order number: ${item.id}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    window.scrollToCwHistory = function () {
+      const el = document.getElementById('cw-history-section');
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    function renderCwWithdrawUI() {
+      const bal = getCwCurrentBalance();
+      document.getElementById('cw-avail-balance').textContent = '₹' + bal.toFixed(2);
+      document.getElementById('cw-withdrawable-bal').textContent = '₹' + bal.toFixed(2);
+      document.getElementById('cw-approval-notice').style.display = isCw500Unlocked() ? 'none' : 'block';
+      renderCwChipsAndRange();
+      renderCwAccountCard();
+      updateCwReceivePreview();
+      renderCwHistory();
+    }
+
+    document.addEventListener('click', function (e) {
+      const trigger = e.target.closest('[data-open-withdraw], #open-withdraw-btn, .withdraw-trigger');
+      if (trigger) {
+        e.preventDefault();
+        openCobraWithdrawPage();
+      }
+    });
+    const gateInfoEl = document.getElementById('dash-withdraw-gate-info');
+    if (gateInfoEl) {
+      gateInfoEl.style.cursor = 'pointer';
+      gateInfoEl.addEventListener('click', function () {
+        openCobraWithdrawPage();
+      });
+    }
+  })();
+</script>
+<!-- ==================== END COBRA WIN WITHDRAW PAGE ==================== -->
 </body>
 </html>
