@@ -3585,25 +3585,68 @@ function startWingoRoomsLoop() {
                 }
             }
         });
+      function settleLocalBetRecords(periodId, mode, resultObj) {
+            if (!periodId || !resultObj || !Array.isArray(myBetRecords)) return;
+            const pid = String(periodId);
+            const winNum = Number(resultObj.number);
+            const winSize = String(resultObj.bigSmall || (winNum >= 5 ? 'Big' : 'Small')).toLowerCase();
+            const winColors = Array.isArray(resultObj.colors)
+                ? resultObj.colors.map(c => String(c).toLowerCase())
+                : [String(resultObj.primaryColor || '').toLowerCase()];
+
+            let updated = false;
+            myBetRecords.forEach(rec => {
+                if (String(rec.periodId) === pid && rec.status === 'Pending') {
+                    const bType = String(rec.type || '').toLowerCase();
+                    const bVal = String(rec.value || '').toLowerCase();
+                    let won = false;
+                    let mult = 1.96;
+
+                    if (bType === 'number' && Number(bVal) === winNum) {
+                        won = true;
+                        mult = 9.9;
+                    } else if (bType === 'size' && bVal === winSize) {
+                        won = true;
+                        mult = 1.96;
+                    } else if (bType === 'color' && winColors.includes(bVal)) {
+                        won = true;
+                        mult = bVal === 'violet' ? 4.5 : 1.96;
+                    }
+
+                    rec.status = won ? 'Succeed' : 'Failed';
+                    rec.winAmount = won ? Number((Number(rec.amount) * mult).toFixed(2)) : 0;
+                    updated = true;
+                }
+            });
+
+            if (updated && typeof renderMyBetHistory === 'function') {
+                renderMyBetHistory();
+            }
+        }
+
+        socket.on('roundSettled', (data) => {
+            if (!data) return;
+            settleLocalBetRecords(data.periodId, data.mode, data.result);
+        });
+
         socket.on('roundResult', (data) => {
-  if (!data) return;
-  if (data.newBalance !== undefined && data.newBalance !== null) {
-    if (typeof currentUser !== 'undefined' && currentUser) {
-      currentUser.balance = Number(data.newBalance);
-    }
-    if (typeof renderUserBalance === 'function') {
-      renderUserBalance(Number(data.newBalance));
-    } else if (typeof updateBalanceUI === 'function') {
-      updateBalanceUI(Number(data.newBalance));
-    }
-  }
-   if (typeof renderMyBetHistory === 'function') {
-            renderMyBetHistory();
-        }
-        if (typeof room !== 'undefined' && room && typeof renderHistory === 'function') {
-            renderHistory(room.history);
-        }
-});
+            if (!data) return;
+            const isMe = !data.userId || (typeof currentUser !== 'undefined' && currentUser && String(currentUser.id) === String(data.userId));
+            if (isMe && data.newBalance !== undefined && data.newBalance !== null) {
+                if (typeof currentUser !== 'undefined' && currentUser) {
+                    currentUser.balance = Number(data.newBalance);
+                }
+                if (typeof renderUserBalance === 'function') {
+                    renderUserBalance(Number(data.newBalance));
+                } else if (typeof updateBalanceUI === 'function') {
+                    updateBalanceUI(Number(data.newBalance));
+                }
+            }
+            settleLocalBetRecords(data.periodId, data.mode, data.result);
+            if (typeof room !== 'undefined' && room && typeof renderHistory === 'function') {
+                renderHistory(room.history);
+            }
+        });
 
         socket.on('depositStatusUpdated', (payload) => {
             const isTargetUser = currentUser && (

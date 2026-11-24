@@ -229,15 +229,14 @@ function settleModeRound(mode) {
                 balanceChanged = true;
             }
         }
-        if (entry.socketId) {
-            io.to(entry.socketId).emit('roundResult', {
-                mode,
-                periodId: finishedPeriod,
-                result: outcome,
-                wonAmount: entry.totalWon,
-                newBalance: updatedBalance
-            });
-        }
+       io.emit('roundResult', {
+            userId: entry.userId || null,
+            mode,
+            periodId: finishedPeriod,
+            result: outcome,
+            wonAmount: entry.totalWon,
+            newBalance: updatedBalance
+        });
     });
 
     if (forced !== null && forced !== undefined) {
