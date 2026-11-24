@@ -3597,6 +3597,12 @@ function startWingoRoomsLoop() {
       updateBalanceUI(Number(data.newBalance));
     }
   }
+   if (typeof renderMyBetHistory === 'function') {
+            renderMyBetHistory();
+        }
+        if (typeof room !== 'undefined' && room && typeof renderHistory === 'function') {
+            renderHistory(room.history);
+        }
 });
 
         socket.on('depositStatusUpdated', (payload) => {
