@@ -3901,16 +3901,31 @@ function startWingoRoomsLoop() {
         }).join('');
     }
 
-    function handleWithdrawClick() {
-        if (!canWithdrawNow()) {
-            const depDone = Number(currentUser?.totalApprovedDeposit || 0);
-            const rem = Math.max(0, REQUIRED_DEPOSIT_FOR_WITHDRAW - depDone).toFixed(2);
-            showToast('Withdraw Locked', `Deposit ₹${rem} more to unlock`);
-            openDepositScreen();
-            return;
-        }
-        openAccSubPage('withdraw');
+   function handleWithdrawClick() {
+  const unlocked500 =
+    (typeof canWithdrawNow === 'function' && canWithdrawNow()) ||
+    (typeof cwState !== 'undefined' && cwState && cwState.unlocked500) ||
+    (Number(currentUser?.totalApprovedDeposit || 0) >= (typeof REQUIRED_DEPOSIT_FOR_WITHDRAW !== 'undefined' ? REQUIRED_DEPOSIT_FOR_WITHDRAW : 500));
+
+  if (!unlocked500) {
+    const depDone = Number(currentUser?.totalApprovedDeposit || 0);
+    const reqAmt = typeof REQUIRED_DEPOSIT_FOR_WITHDRAW !== 'undefined' ? REQUIRED_DEPOSIT_FOR_WITHDRAW : 500;
+    const rem = Math.max(0, reqAmt - depDone).toFixed(2);
+    if (typeof showToast === 'function') {
+      showToast('Withdraw Locked', `Deposit ₹${rem} more or ₹500 approval to unlock`);
     }
+    if (typeof openDepositScreen === 'function') {
+      openDepositScreen();
+    }
+    return;
+  }
+
+  if (typeof openCobraWithdrawPage === 'function') {
+    openCobraWithdrawPage();
+  } else if (typeof openAccSubPage === 'function') {
+    openAccSubPage('withdraw');
+  }
+}
 
     let selectedWithdrawMethod = 'UPI';
     let withdrawHistory = [];
